@@ -1,0 +1,110 @@
+from PIL import Image
+import random
+import itertools
+import math
+import os
+
+# Get image
+def get_img():
+    img = Image.open('C:/Users/KIIT/Documents/AI Assignment/Rajput_Khanda.jpg')
+    return img
+
+# Converting image to 1-D vector
+def img_to_vector(img):
+    pixels = list(img.getdata())
+    colors = list(itertools.chain(*pixels))
+    return colors
+
+# Vector to image
+def vec_to_image(colors, img):
+    width, height = img.size
+    img_bytes = bytes(colors)
+    im = Image.frombytes("RGB", (width, height), img_bytes)
+    im.show()
+
+def the_first_generation(no_of_genes, population):
+    population_dna = []
+    for _ in range(population):
+        colors_dna = [random.randint(0, 255) for _ in range(no_of_genes)]
+        population_dna.append(colors_dna)
+    return population_dna
+
+def fitness_score(dna, target):
+    score = sum(1 for gene1, gene2 in zip(dna, target) if gene1 == gene2)
+    fitness = (score / len(target)) * 100
+    print("fitness=", fitness)
+
+def calculate_score(population_record, target):
+    selection_probability = []
+    for dna in population_record:
+        score = sum(1 for gene1, gene2 in zip(dna, target) if gene1 == gene2)
+        selection_probability.append((score / len(target) * 100) ** 3)
+    return selection_probability
+
+def save_fittest_dna(fittest):
+    with open('fittest.txt', 'a') as f:
+        f.write(' '.join(map(str, fittest)) + '\n')
+
+def perform_natural_selection(population_record, selection_prob, mutation_extent):
+    population = len(population_record)
+    next_generation = []
+    for _ in range(population):
+        parents = random.choices(population_record, weights=selection_prob, k=2)
+        child = crossover_slice(parents, mutation_extent)
+        next_generation.append(child)
+    return next_generation
+
+def crossover_slice(parents, mutation_extent):
+    infant = []
+    parentA = parents[0]
+    parentB = parents[1]
+    midpoint = random.randint(0, len(parentA))
+    for i in range(midpoint):
+        infant.append(parentA[i])
+    for i in range(midpoint, len(parentA)):
+        infant.append(parentB[i])
+    child = mutation(infant, mutation_extent)
+    return child
+
+def crossover_random(parents, mutation_extent):
+    infant = [random.choice([geneA, geneB]) for geneA, geneB in zip(parents[0], parents[1])]
+    child = mutation(infant, mutation_extent)
+    return child
+
+def mutation(infant, mutation_extent):
+    genes_to_modify = len(infant) * mutation_extent // 100
+    for _ in range(genes_to_modify):
+        start = random.randint(0, len(infant) - 1)
+        infant[start] = random.randint(0, 255)
+    return infant
+
+def setup():
+    mutation_extent = 3
+    population = 1000
+    generation_count = 0
+    original_image = get_img()
+    target_dna = img_to_vector(original_image)
+    population_record = the_first_generation(len(target_dna), population)
+    
+    if os.path.exists('fittest.txt'):
+        os.remove("fittest.txt")
+    
+    while True:
+        selection_prob = calculate_score(population_record, target_dna)
+        population_record = perform_natural_selection(population_record, selection_prob, mutation_extent)
+        fittest = population_record[selection_prob.index(max(selection_prob))]
+        save_fittest_dna(fittest)
+        generation_count += 1
+
+        if generation_count % 500 == 0:
+            vec_to_image(fittest, original_image)
+        
+        print("generation: ", generation_count)
+        fitness_score(fittest, target_dna)
+
+        if fittest == target_dna:
+            print(generation_count, "Generations")
+            print("\n**** Image regenerated successfully ****\n")
+            break
+
+setup()
